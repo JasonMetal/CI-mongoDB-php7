@@ -52,7 +52,6 @@ Class Mongodb{
 		$this->config = $this->CI->config->item('mongodb');
 		$this->param = $param;
 
-// 
 		$this->connectMongo();
 
 	}
@@ -396,7 +395,7 @@ Class Mongodb{
 			foreach ($where as $key => $value) {
 				$this->where['$or'][] = [$key => $value];
 			}
-			return ($this);
+			return $this;
 
 		}
 		else{
@@ -422,7 +421,7 @@ Class Mongodb{
 
 			$this->where[$field]['$in'] = $in;
 
-			return ($this);
+			return $this;
 		}
 
 	}
@@ -445,7 +444,7 @@ Class Mongodb{
 			$this->_w($column);
 			$this->where[$column]['$all'] = $in;
 			// echo "<pre>"; print_r($this->where);die;
-			return ($this);
+			return $this;
 
 		}
 		else{
@@ -470,7 +469,7 @@ Class Mongodb{
 			$this->_w($column);
 			$this->where[$column]['$nin'] = $in;
 
-			return ($this);
+			return $this;
 		}
 		else{
 			show_error('in value should be an array',500);
@@ -500,7 +499,7 @@ Class Mongodb{
 
 		}
 
-		return ($this);
+		return $this;
 
 	}
 
@@ -524,7 +523,7 @@ Class Mongodb{
 			$this->where[$column]['$gte'] = $num;
 		}
 
-		return ($this);
+		return $this;
 
 	}
 
@@ -547,7 +546,7 @@ Class Mongodb{
 			$this->where[$column]['$lt'] = $num;
 		}
 
-		return ($this);
+		return $this;
 
 	}
 
@@ -570,7 +569,7 @@ Class Mongodb{
 			$this->where[$column]['$lte'] = $num;
 		}
 
-		return ($this);
+		return $this;
 
 	}
 
@@ -598,7 +597,7 @@ Class Mongodb{
 			$this->where[$column]['$lte'] = $num2;
 		}
 
-		return ($this);
+		return $this;
 	}
 
 	/*
@@ -624,7 +623,7 @@ Class Mongodb{
 			$this->where[$column]['$lt'] = $num2;
 		}
 
-		return ($this);
+		return $this;
 
 	}
 
@@ -647,7 +646,7 @@ Class Mongodb{
 			$this->where[$column]['$ne'] = $num1;
 		}
 
-		return ($this);
+		return $this;
 
 	}
 
@@ -711,7 +710,7 @@ Class Mongodb{
 
 		$this->where[$column] = new MongoDB\BSON\Regex($value,$flag);
 
-		return ($this);
+		return $this;
 
 	}
 
@@ -729,7 +728,7 @@ Class Mongodb{
 		}
 		else{
 
-			$query = new MongoDB\Driver\Query($this->where, []);
+			$query = new MongoDB\Driver\Query($this->where, ['limit' => $this->limit]);
 			// echo "<pre>"; print_r($query);die;
 			$readPreference = new MongoDB\Driver\ReadPreference(MongoDB\Driver\ReadPreference::RP_PRIMARY);
 			$cursor = $this->connect->executeQuery($this->db.'.'.$collection, $query, $readPreference);
@@ -863,8 +862,212 @@ Class Mongodb{
 
 	}
 
+	/**
+	 * This function can be used to unset a fields
+	 *
+	 * @usage: $this->mongodb->where(['foo' => 'bar'])->unset(['asd','cdc'])->update('foobar');
+	 *
+	*/
 	
-	
+	public function unset($columns = []){
+
+		if( !is_array($columns) || empty($columns) || ( $columns == null ) ){
+ 			show_error('$column should be array with valid column name in order to unset',500);
+		}
+		else{
+
+			if( !isset($this->update['$unset']) ){
+				$this->update['$unset'] = [];
+			}
+
+			foreach ($columns as $column) {
+				$this->update['$unset'][$column] = 1;
+			}
+
+			return $this;
+
+		}
+
+	}
+
+	/**
+	* This function can be used to add column in collection
+	* 
+	* This function takes argument as array contains keys as  field name and value as field value
+	*   
+	* @usage: $this->mongodb->where(['foo' => 'bar'])->add_to_set(['created_at' => 123,'updated_at' => 123123])->update('foobar');
+	*
+	*/
+
+	public function add_to_set($columns_val=[]){
+
+		if( !is_array($columns_val) || empty($columns_val) || ($columns_val == null ) ){
+			show_error("Please specify the column and its value in order to alter  the table",500);
+		}
+		else{
+
+			if( ! isset($this->update['$addToSet']) ){
+				$this->update['$addToSet'] = [];
+			}
+
+			foreach ($columns_val as $col => $val) {
+				
+				if( !is_array($val) ){
+					$this->update['$addToSet'][$col] = $val;
+				}
+				else{
+					$this->update['$addToSet'][$col] = ['$each' => $val];
+				}
+
+			}
+
+			return $this;
+
+		}
+
+
+	}
+
+	/**
+     * This function can be used to to rename field of mongoDB collection
+     * 
+     * @usage: $this->mongodb->where(['foo' => 'bar'])->rename_col($oldColName, $newColName)->update('foobar');
+     * 
+	*/
+	public function rename_col($oldColName,$newColName){
+
+		if( !is_string($oldColName) || !is_string($newColName) || empty($oldColName) || empty($newColName) || in_array(null, [$newColName,$oldColName]) ){
+			show_error('Old and New column name is required in order to rename column',500);
+		}
+		else{
+
+			if( !isset($this->update['$rename']) ){
+				$this->update['$rename'] = [];
+			}
+
+			$this->update['$rename'] = [$oldColName => $newColName];
+
+			return $this;
+		}
+
+	}
+
+	/**
+     * This function can be used to increment value of field of mongoDB collection
+     * Field value should be numeric in order to increment it
+     * @usage: $this->mongodb->where(['foo' => 'bar'])->inc(['comments_count' => 1])->update('foobar');
+     * 
+	*/
+	public function inc($data = []){
+
+		if( !is_array($data) || empty($data) || ( $data == null ) ){
+			show_error('column name and value is required in order to increment value',500);
+		}
+		else{
+
+			if( !isset($this->update['$inc']) ){
+				$this->update['$inc'] = [];
+			}
+
+			foreach ($data as $col => $val) {
+				$this->update['$inc'][$col] = $val;				
+			}
+
+			return $this;
+		}
+
+	}	
+
+
+	/**
+     * This function can be used to multiply given value with existing column value
+     * 
+     * @usage: $this->mongodb->where(['foo' => 'bar'])->multiply(['created_at' => 5])->update('foobar');
+     * 
+	*/
+	public function multiply($data = []){
+
+		if( !is_array($data) || empty($data) || ( $data == null ) ){
+			show_error('column name and value is required in order to increment value',500);
+		}
+		else{
+
+			if( !isset($this->update['$mul']) ){
+				$this->update['$mul'] = [];
+			}
+
+			foreach ($data as $col => $val) {
+				$this->update['$mul'][$col] = $val;				
+			}
+
+			return $this;
+		}
+
+	}
+
+	/**
+     * This function can be used to delete collection
+     * 
+     * @usage: $this->mongodb->where(['foo' => 'bar'])->delete('foobar');
+     * 
+	*/
+	public function delete($collection = ""){
+
+		if( !is_string($collection) || empty($collection) || ( $collection == null ) ){
+			show_error('collection name is required in order to delete',500);
+		}
+		else{
+
+			try{
+
+				$bulk = new MongoDB\Driver\BulkWrite();
+
+				$bulk->delete($this->where);
+
+				$result = $this->connect->executeBulkWrite($this->db.'.'.$collection, $bulk);
+				
+				$error = $result->getWriteErrors();
+
+				if(empty($error)){
+					return true;	
+				}
+				else{
+					show_error("Deletion failed.",500);
+				}
+
+			}
+			catch( MongoCursorException $e ){
+
+				if( isset($this->debug) && $this->debug ){
+					show_error("Delete data from mongodb's collection failed: {$e->getMessage()}",500);
+				}
+				else{
+					show_error("Delete data from mongoDB's collection is failed.",500);
+				}
+
+			}
+		}
+
+	}
+
+
+	/**
+     * This function can be used to set the limit 
+     * 
+     * $this->mongodb->limit(3)->get('foobar');
+	*/
+
+	public function limit($num = 999999){
+
+		if( !is_numeric($num) || ($num == null) || ( $num < 1 ) ){
+			show_error('Limit should be numeric value greater than 1 and not null',500);
+		}
+
+		$this->limit = (int)$num;
+
+		return $this;
+	}
+
 	/**
 	 * This function can be used to update the collection
 	 *
