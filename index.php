@@ -29,12 +29,12 @@ Class Mongodb{
 	private $debug;
 	private $write_concerns;
 	private $journal;
-	private $selects = array();
+	private $select = array();
 	private $update = array();
 	private $where	= array();
 	private $limit	= 999999;
 	private $offset	= 0;
-	private $sorts	= array();
+	private $sort	= array();
 	private $return_as = 'array';
 	public $benchmark = array();
 
@@ -52,6 +52,7 @@ Class Mongodb{
 		$this->config = $this->CI->config->item('mongodb');
 		$this->param = $param;
 
+ 
 		$this->connectMongo();
 
 	}
@@ -183,6 +184,8 @@ Class Mongodb{
 
 			$this->db = $this->database;
 
+			$this->_clear();
+
 		}
 		catch(MongoConnectionException $e){
 
@@ -226,6 +229,8 @@ Class Mongodb{
 			$bulk->insert($data);
 
 			$result = $this->connect->executeBulkWrite($this->db.'.'.$collection, $bulk);
+
+			$this->_clear();
 
 			if(empty($result->getWriteErrors())){
 				return (String)$data['_id'];
@@ -289,6 +294,8 @@ Class Mongodb{
 			}
 
 			$result = $this->connect->executeBulkWrite($this->db.'.'.$collection, $bulk);
+
+			$this->_clear();
 
 			if(empty($result->getWriteErrors())){
 				return $insert_arr;
@@ -728,12 +735,13 @@ Class Mongodb{
 		}
 		else{
 
-			$query = new MongoDB\Driver\Query($this->where, ['limit' => $this->limit]);
-			// echo "<pre>"; print_r($query);die;
+			$query = new MongoDB\Driver\Query($this->where, ['limit' => $this->limit,'sort' => $this->sort]);
 			$readPreference = new MongoDB\Driver\ReadPreference(MongoDB\Driver\ReadPreference::RP_PRIMARY);
 			$cursor = $this->connect->executeQuery($this->db.'.'.$collection, $query, $readPreference);
 			
-			return $cursor;
+			$this->_clear();
+
+			return iterator_to_array($cursor);
 		}
 
 	}
@@ -785,9 +793,13 @@ Class Mongodb{
 
 			try{
 
+				$this->_clear();
+
 				$this->where["_id"] = new MongoDB\BSON\ObjectID($id);
 
-				return $this->get($collection);
+				$return = $this->get($collection);
+
+				return empty($return) ? [] : $return[0];
 
 			}
 			catch( MongoCursorException $e ){
@@ -1028,6 +1040,8 @@ Class Mongodb{
 				
 				$error = $result->getWriteErrors();
 
+				$this->_clear();
+
 				if(empty($error)){
 					return true;	
 				}
@@ -1069,6 +1083,28 @@ Class Mongodb{
 	}
 
 	/**
+     * This function can be used to fetch result in order 
+     * 
+     * $this->mongodb->order_by('foo','asc')->get('foobar');
+	*/
+
+	public function order_by($colname,$order){
+
+		if( empty($colname) || empty($order) || ($colname == null) || ($order == null) ){
+			show_error('order by condition should be array with key and value pair and not null',500);
+		}
+
+		if( ($order == -1) || ($order === false) || (strtolower($order) == 'desc') ){
+			$this->sort[$colname] = -1;
+		}
+		elseif( ($order == 1) || ($order === true) || (strtolower($order) == 'asc') ){
+			$this->sort[$colname] = 1;
+		}
+
+		return $this;
+	}
+
+	/**
 	 * This function can be used to update the collection
 	 *
 	 * @usage: $this->mongodb->where(['foo' => 'bar'])->set(['foo' => 'rab'])->update('foobar');
@@ -1093,6 +1129,8 @@ Class Mongodb{
 				$result = $this->connect->executeBulkWrite($this->db.'.'.$collection, $bulk);
 				
 				$error = $result->getWriteErrors();
+
+				$this->_clear();
 
 				if(empty($error)){
 					return true;	
@@ -1131,5 +1169,16 @@ Class Mongodb{
 		{
 			$this->where[$param] = array();
 		}
+	}
+
+	private function _clear(){
+
+		$this->select	= array();
+		$this->update	= array();
+		$this->where	= array();
+		$this->limit	= 999999;
+		$this->offset	= 0;
+		$this->sort	= array();
+
 	}
 }
